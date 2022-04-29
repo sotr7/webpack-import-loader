@@ -42,8 +42,12 @@ module.exports = function(source) {
   var importSass = /@import +([\'\"])(.*?)\1/gm;
   var resourceDir = path.dirname(this.resourcePath);
 
-  var regex2 = /.?import + ?(\{?[ ?(\w+),? ?]+\}? +from )?([\'\"])?(.*?);?\2/gm;
+  var regex2 = /.?import + ?(\{ ?(.*)? ?\} from )?([\'\"])(.*?);?\3/gm;
+  var regex2_3 = /.?import + ?(\{ ?(\/\*(.*)\*\/)? ?(.*) ?\} from )?([\'\"])(.*?);?\5/gm;
+  var regex2_2 = /.?import ?\{ ?([(\/\* ?(\w+) ?\*\/)? ?( ?(\w+),? ?)]+)? ?\}? +from ([\'\"])?(.*?);?\2/gm;
+  var regex2_1 = /.?import + ?(\{?[ ?(\w+),? ?]+\}? +from )?([\'\"])?(.*?);?\2/gm;
   var objsReg = /\{? ?(.*?) ?\}? +from ?/g;
+  var objsExcludeReg = /(\/\* ?(.*?) ?\*\/)/g;
 
   var nodeModulesPath = walkUpToFindNodeModulesPath(resourceDir);
   var srcPath = walkUpToFindScPath(resourceDir);
@@ -105,11 +109,12 @@ module.exports = function(source) {
     return result;
   }
 
-  function replacer2(match, fromStatement, /*obj, */quote, filename) {
+  function replacer2(match, fromStatement, imports, quote, filename) {
     var modules = [];
     var withModules = false;
     var objs = new RegExp(objsReg).exec(fromStatement)[1];
     // console.log("objs: ", objs);
+    objs = objs.replace(objsExcludeReg, '');
     if(objs.indexOf(',') > -1) {
       objs = objs.split(",");
     }
@@ -131,25 +136,28 @@ module.exports = function(source) {
       cwdPath = resourceDir;
     }
 
-	var incDirPath;
+    var incDirPath;
 
-	if(Array.isArray(objs)) {
-		for(var i = 0; i < objs.length; i++) {
-			if(filename.indexOf(objs[i].trim()) > -1) {
-				incDirPath = path.resolve(cwdPath, filename.substr(0, filename.length - objs[i].length));
-			} else {
-				incDirPath = path.resolve(cwdPath, filename);			
-			}
-			objs[i] = objs[i].trim() + '.js'
-		}
-	} else {
-		if(filename.indexOf(objs.trim()) > -1) {
-			incDirPath = path.resolve(cwdPath, filename.substr(0, filename.length - objs.length));
-		} else {
-			incDirPath = path.resolve(cwdPath, filename);			
-		}
-		objs = objs.trim() + '.js'
-	}
+    if(Array.isArray(objs)) {
+      for(var i = 0; i < objs.length; i++) {
+        if(filename.indexOf(objs[i].trim()) > -1) {
+          incDirPath = path.resolve(cwdPath, filename.substr(0, filename.length - objs[i].length));
+        } else {
+          incDirPath = path.resolve(cwdPath, filename);			
+        }
+        objs[i] = objs[i].trim() ? objs[i].trim() + '.js' : null;
+      }
+      objs = objs.filter(function (el) {
+        return el != null;
+      });
+    } else {
+      if(filename.indexOf(objs.trim()) > -1) {
+        incDirPath = path.resolve(cwdPath, filename.substr(0, filename.length - objs.length));
+      } else {
+        incDirPath = path.resolve(cwdPath, filename);			
+      }
+      objs = objs.trim() + '.js'
+    }
 	
 	// console.log(incDirPath);
 
